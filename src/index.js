@@ -128,7 +128,7 @@ class Game extends React.Component {
       }],
       xIsNext: true,
       stepNumber: 0,
-      movesReversed: false,
+      //movesReversed: false, -- THIS FEATURE HAS BEEN REMOVED
     };
   }
 
@@ -140,15 +140,15 @@ class Game extends React.Component {
   */
   handleClick(i) {
 
-    /*
+    /* THIS FEATURE HAS BEEN REMOVED
     Since this game gives the players the option to reverse the list of past moves on
     the game's status board, this if statement will put the list of past moves back
     in the original order if the list is currently reversed. It calls the handleReorder
-    method to accomplish this.
+    method to accomplish this. 
     */
-    if (!this.state.movesReversed) {
-      this.handleReorder();
-    }
+    // if (!this.state.movesReversed) {
+    //   this.handleReorder();
+    // }
 
     // Makes a variable that holds a copy of the history array that is held in state
     const history = this.state.history.slice(0, this.state.stepNumber + 1);
@@ -202,37 +202,105 @@ class Game extends React.Component {
 
       // Updates what turn number we are on
       stepNumber: history.length,
-    });
+    }, this.handleCompTurn); // handleCompTurn is called after setState is complete
   }
 
-  // This handleReorder function controls the reversing of the list of past moves
-  handleReorder() {
-    // Creates a variable that represents the unordered list in the DOM
-    // (the unordered list is the list of past moves)
-    var movesList = document.getElementById("movesList");
+  // This function allows the computer to take its turn
+  handleCompTurn() {
+    // Creates a variable that holds a copy of the history array from state
+    const history = this.state.history.slice(0, this.state.stepNumber + 1);
 
-    // Creates a variable that holds the # of children (items) that the unordered
-    // list has
-    var i = movesList.childNodes.length;
+    // Creates a variable that holds a copy of the last object in the history array
+    const current = history[history.length - 1];
+    
+    // Creates a variable that holds a copy of the squares array of the last object in the history array
+    const squares = current.squares.slice();
+    
+    // Creates a variable that holds a copy of the value of the pastXIsNext property of the last object in the history array
+    const pastXIsNext = current.pastXIsNext;
 
-    // While i >= 0, the code in curly braces will execute, then subtract 1 from i
-    while (i--) {
-      /*
-      For each item in the unordered list, starting with the last one, this line of
-      code will take the item out of its original location and place it at the end
-      of the list. The end result of this will be a reversal of the original list.
-      */
-      movesList.appendChild(movesList.childNodes[i]);
+    // Creates a variable that holds an empty array
+    let openMoveArr = [];
+
+    // Creates a variable that will hold a random number
+    let randIndex;
+
+    // Creates a variable that will hold the index of the squares array that "the computer" will choose
+    let compChoice;
+    
+    // This for loop will iterate through the entire squares array
+    for (var j = 0; j < squares.length; j++) {
+      // If the element at the particular index of the squares array is null (meaning that it has not been played yet)...
+      if (!squares[j]) {
+        //... then push that index number onto the openMoveArr array
+        openMoveArr.push(j);
+      }
     }
 
-    // Sets the new state
+    // If there is a winner or if there are no more available moves...
+    if (calculateWinner(squares) || openMoveArr.length <= 0) {
+      //... then return early from the handleCompTurn function
+      return;
+    }
+
+    // Sets randIndex equal to a random index of the openMoveArr array
+    randIndex = Math.floor(Math.random() * openMoveArr.length);
+
+    // Sets compChoice equal to the number located at the randIndex of the openMoveArr array
+    compChoice = openMoveArr[randIndex];
+
+    // Sets the value of the chosen element of the squares array based on whose turn it is
+    squares[compChoice] = this.state.xIsNext ? "X" : "O";
+
+    // Updates state
     this.setState({
-      // Since the list was just reversed, the movesReversed boolean must be toggled
-      // so that state knows whether the list is in the default order (start -> finish)
-      // or in reverse order (finish -> start)
-      movesReversed: !this.state.movesReversed,
-    });
+      // Adds a new object to the end of the history array
+      history: history.concat([{
+        // Squares will reflect the most recent move
+        squares: squares,
+
+        // Remembers which square the computer chose this turn
+        clicked: compChoice,
+
+        // Remembers whose turn it was on this most recent turn
+        pastXIsNext: !pastXIsNext,
+      }]),
+      // Toggles whose turn it is in state
+      xIsNext: !this.state.xIsNext,
+
+      // Updates the turn number
+      stepNumber: history.length
+    })
   }
+
+  // // THIS FEATURE HAS BEEN REMOVED -- This handleReorder function controls the reversing of the list of past moves
+  // handleReorder() {
+  //   // Creates a variable that represents the unordered list in the DOM
+  //   // (the unordered list is the list of past moves)
+  //   var movesList = document.getElementById("movesList");
+
+  //   // Creates a variable that holds the # of children (items) that the unordered
+  //   // list has
+  //   var i = movesList.childNodes.length;
+
+  //   // While i >= 0, the code in curly braces will execute, then subtract 1 from i
+  //   while (i--) {
+  //     /*
+  //     For each item in the unordered list, starting with the last one, this line of
+  //     code will take the item out of its original location and place it at the end
+  //     of the list. The end result of this will be a reversal of the original list.
+  //     */
+  //     movesList.appendChild(movesList.childNodes[i]);
+  //   }
+
+  //   // Sets the new state
+  //   this.setState({
+  //     // Since the list was just reversed, the movesReversed boolean must be toggled
+  //     // so that state knows whether the list is in the default order (start -> finish)
+  //     // or in reverse order (finish -> start)
+  //     movesReversed: !this.state.movesReversed,
+  //   });
+  // }
 
   /*
   The jumpTo method is used when the user decides to go back to a previous move (or state).
@@ -357,9 +425,16 @@ class Game extends React.Component {
           style={this.state.stepNumber === move ? 
             {fontWeight: 'bold'} : {fontWeight: 'normal'}}>
           <div>{summary}</div>
-          <button onClick={() => this.jumpTo(move)}
-            >{desc}
-          </button>
+
+          {
+            /* If on "move 0" (start of the game) or on an even-numbered move (meaning the computer just took its turn)...*/
+            (move % 2 === 0) && 
+
+            /*... then a button will be rendered that allows the user to return to that move. This prevents the user from being able to go back and alter moves that the computer made. */
+            (<button onClick={() => this.jumpTo(move)}>
+              {desc}
+            </button>)
+          }
         </li>
       );
     });
@@ -400,10 +475,10 @@ class Game extends React.Component {
         <div className="game-info">
           <div id="status">{status}</div>
           <div id="historyTitle">Past Moves:</div>
-          <ul id='movesList' style={{ listStyleType: 'none'}}>
+          <ol id='movesList' start="0">
             {moves}
-          </ul>
-          <button id='toggleButton' onClick={() => this.handleReorder()}>Reverse Steps</button>
+          </ol>
+          {/* <button id='toggleButton' onClick={() => this.handleReorder()}>Reverse Steps</button> -- THIS FEATURE HAS BEEN REMOVED*/}
         </div>
       </div>
     );
